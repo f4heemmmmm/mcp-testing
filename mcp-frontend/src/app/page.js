@@ -100,75 +100,146 @@ export default function Home() {
     };
 
     const generateResponse = async (userMessage) => {
-    const emailRequest = parseEmailRequest(userMessage);
-    
-    if (!emailRequest) {
-        if (MCPEnabled && MCPStatus === "connected") {
-            return "I can help you draft emails with personalized context from your local files! Try asking 'draft me an email for [person's name]'. With MCP enabled, I'll analyze your file system for communication patterns and context.";
-        } else {
-            return "I can help you draft emails! Try asking 'draft me an email for [person's name]'. I'll use AI to generate a professional email draft.";
-        }
-    }
-
+  const emailRequest = parseEmailRequest(userMessage);
+  
+  if (!emailRequest) {
     if (MCPEnabled && MCPStatus === "connected") {
-        // Use MCP backend with full context analysis
-        const emailResult = await generateEmailWithMCP(emailRequest.recipient);
-    
-        if (emailResult.error) {
-            return `Error connecting to MCP server: ${emailResult.error}. Please ensure the MCP server is running on port 3001.`;
-        }
-
-        let response = `**MCP Analysis Complete for ${emailRequest.recipient}:**\n\n`;
-        
-        if (emailResult.context) {
-            if (emailResult.context.dataSource === "mock") {
-                response += `⚠️ **Using Mock Data** (No local files found for ${emailResult.recipient})\n\n`;
-            } else {
-                response += `✅ **Real File Analysis** (Found ${emailResult.context.foundFiles} relevant files)\n\n`;
-            }
-            
-            response += `**Context Found:**\n`;
-            response += `• Relationship: ${emailResult.context.relationship}\n`;
-            response += `• Communication Style: ${emailResult.context.communicationStyle}\n`;
-            response += `• Common Topics: ${emailResult.context.commonTopics?.join(", ") || "None identified"}\n`;
-            response += `• Last Interaction: ${emailResult.context.lastInteractionDate}\n`;
-
-            if (emailResult.context.recentContext) {
-                response += `• Recent Context: ${emailResult.context.recentContext}\n`;
-            }
-            response += `\n`;
-        }
-
-        response += `**Personalized Email Draft:**\n${emailResult.emailDraft}`;
-        
-        return response;
+      return "I can help you draft emails with personalized context from your Outlook and local files! Try asking 'draft me an email for [person's name]'. With MCP enabled, I'll analyze your communication history for tone, style, and context.";
     } else {
-        // MCP disabled - use direct AI generation without context
-        const aiEmailResult = await generateEmailWithoutMCP(emailRequest.recipient, emailRequest.originalMessage);
-        
-        if (aiEmailResult.error) {
-            // Fallback to basic template if AI fails
-            const recipient = emailRequest.recipient;
-            const name = recipient.charAt(0).toUpperCase() + recipient.slice(1);
-            
-            return `**AI Generation Failed** - Using Basic Template\n\n**Email Draft:**\nSubject: Hello ${name}\n\nHi ${name},\n\nI hope you're doing well. I wanted to reach out regarding [topic/reason for email].\n\n[Your main message here]\n\nPlease let me know if you have any questions.\n\nBest regards,\n[Your name]\n\n*Note: AI generation failed (${aiEmailResult.error}). Enable MCP server for personalized context.*`;
-        }
-
-        return `**AI-Generated Email (No Context):**\n\n${aiEmailResult.emailDraft}`;
+      return "I can help you draft emails! Try asking 'draft me an email for [person's name]'. I'll use AI to generate a professional email draft.";
     }
+  }
+
+  if (MCPEnabled && MCPStatus === "connected") {
+    // Use enhanced MCP backend with full context analysis
+    const emailResult = await generateEmailWithEnhancedMCP(emailRequest.recipient, emailRequest.originalMessage);
+
+    if (emailResult.error) {
+      return `Error connecting to MCP server: ${emailResult.error}. Please ensure the MCP server is running on port 3001.`;
+    }
+
+    let response = `**📧 Enhanced MCP Analysis for ${emailRequest.recipient}:**\n\n`;
+    
+    // Display analysis details
+    if (emailResult.analysisDetails) {
+      const details = emailResult.analysisDetails;
+      response += `**📊 Analysis Summary:**\n`;
+      response += `• Data Source: ${details.searchSource || 'Unknown'}\n`;
+      response += `• Emails Analyzed: ${details.totalEmails || 0}\n`;
+      response += `• AI Enhanced: ${details.aiEnhanced ? '✅ Yes' : '❌ No'}\n\n`;
+    }
+    
+    if (emailResult.context) {
+      if (emailResult.context.dataSource === "none" || emailResult.context.dataSource === "mock") {
+        response += `⚠️ **Using Mock Data** (No communication history found for ${emailRequest.recipient})\n\n`;
+      } else {
+        response += `✅ **Real Communication Analysis** (${emailResult.context.dataSource === 'outlook' ? 'Outlook emails' : 'File system data'})\n\n`;
+      }
+      
+      response += `**🎯 Communication Profile:**\n`;
+      response += `• Relationship: ${emailResult.context.relationship || 'Unknown'}\n`;
+      response += `• Communication Style: ${emailResult.context.communicationStyle || 'Unknown'}\n`;
+      
+      if (emailResult.context.tone) {
+        response += `• Tone: ${emailResult.context.tone}\n`;
+      }
+      
+      if (emailResult.context.formality) {
+        response += `• Formality Level: ${emailResult.context.formality}\n`;
+      }
+      
+      if (emailResult.context.communicationFrequency) {
+        response += `• Communication Frequency: ${emailResult.context.communicationFrequency}\n`;
+      }
+      
+      response += `• Common Topics: ${emailResult.context.commonTopics?.join(", ") || "None identified"}\n`;
+      response += `• Last Interaction: ${emailResult.context.lastInteractionDate || 'Unknown'}\n`;
+
+      if (emailResult.context.recentContext) {
+        response += `• Recent Context: ${emailResult.context.recentContext}\n`;
+      }
+      
+      // AI-enhanced insights
+      if (emailResult.context.aiEnhanced) {
+        response += `\n**🤖 AI-Enhanced Insights:**\n`;
+        if (emailResult.context.toneRecommendation) {
+          response += `• Tone Match: ${emailResult.context.toneRecommendation}\n`;
+        }
+        if (emailResult.context.relationshipInsights) {
+          response += `• Relationship: ${emailResult.context.relationshipInsights}\n`;
+        }
+        if (emailResult.context.keyThemes) {
+          response += `• Key Themes: ${emailResult.context.keyThemes.join(', ')}\n`;
+        }
+      }
+      
+      response += `\n`;
+    }
+
+    response += `**📝 Personalized Email Draft:**\n\n${emailResult.emailDraft}`;
+    
+    if (emailResult.aiGenerated) {
+      response += `\n\n*Generated using ${emailResult.aiModel} with personalized context*`;
+    } else {
+      response += `\n\n*Generated using enhanced templates with context*`;
+    }
+    
+    return response;
+  } else {
+    // MCP disabled - use direct AI generation without context
+    const aiEmailResult = await generateEmailWithoutMCP(emailRequest.recipient, emailRequest.originalMessage);
+    
+    if (aiEmailResult.error) {
+      // Fallback to basic template if AI fails
+      const recipient = emailRequest.recipient;
+      const name = recipient.charAt(0).toUpperCase() + recipient.slice(1);
+      
+      return `**❌ AI Generation Failed** - Using Basic Template\n\n**📝 Email Draft:**\n\nSubject: Hello ${name}\n\nHi ${name},\n\nI hope you're doing well. I wanted to reach out regarding [topic/reason for email].\n\n[Your main message here]\n\nPlease let me know if you have any questions.\n\nBest regards,\n[Your name]\n\n*Note: AI generation failed (${aiEmailResult.error}). Enable MCP server for personalized context.*`;
+    }
+
+    return `**🤖 AI-Generated Email (No Context):**\n\n${aiEmailResult.emailDraft}\n\n*Note: Enable MCP for personalized context based on your communication history*`;
+  }
 };
+
+const generateEmailWithEnhancedMCP = async (recipient, originalMessage) => {
+  try {
+    const response = await fetch("http://localhost:3001/api/email/draft", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ 
+        recipient, 
+        mcpEnabled: true,
+        useAI: true,
+        customMessage: originalMessage
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Enhanced email generation failed:", error);
+    return { error: error.message };
+  }
+};
+
 
 const generateEmailWithoutMCP = async (recipient, originalMessage) => {
     try {
-        const response = await fetch("/api/ai/generate-simple-email", {
-            method: "POST",
+        // Use the existing /api/email/draft endpoint but with mcpEnabled: false
+        const response = await fetch('/api/email/draft', {
+            method: 'POST',
             headers: {
-                "Content-Type": "application/json",
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({ 
                 recipient, 
-                originalMessage,
-                useBasicPrompt: true 
+                mcpEnabled: false,  // This is the key - explicitly disable MCP
+                useAI: true         // But still try to use AI
             }),
         });
 
@@ -176,33 +247,22 @@ const generateEmailWithoutMCP = async (recipient, originalMessage) => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        return await response.json();
+        const result = await response.json();
+        
+        // Transform the result to match what the frontend expects
+        return {
+            emailDraft: result.emailDraft,
+            aiGenerated: result.aiGenerated,
+            error: result.error
+        };
+
     } catch (error) {
-        console.error("AI email generation failed:", error);
+        console.error('AI email generation failed:', error);
         return { error: error.message };
     }
 };
 
-    const parseEmailRequest = (message) => {
-    const emailPatterns = [
-      /draft.*email.*for\s+(\w+)/i,
-      /write.*email.*to\s+(\w+)/i,
-      /email.*(\w+).*about/i,
-      /respond.*to\s+(\w+)/i
-    ];
-
-    for (const pattern of emailPatterns) {
-      const match = message.match(pattern);
-      if (match) {
-        return {
-          recipient: match[1].toLowerCase(),
-          originalMessage: message
-        };
-      }
-    }
-    return null;
-  };
-
+   
   const callMCPTool = async (tool, args) => {
     try {
       const response = await fetch("http://localhost:3001/api/mcp/execute", {
@@ -225,20 +285,20 @@ const generateEmailWithoutMCP = async (recipient, originalMessage) => {
   };
 
   const generateEmailWithMCP = async (recipient) => {
-        try {
-            const response = await fetch("http://localhost:3001/api/email/draft", {
-                method: "POST",
-                headers: {
-                "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ recipient, MCPEnabled }),
-            });
+    try {
+        const response = await fetch("http://localhost:3001/api/email/draft", {
+            method: "POST",
+            headers: {
+            "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ recipient, MCPEnabled }),
+        });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-            return await response.json();
+        return await response.json();
         } catch (error) {
             console.error("Email generation failed:", error);
             return { error: error.message };
@@ -246,45 +306,94 @@ const generateEmailWithoutMCP = async (recipient, originalMessage) => {
     };
 
   const testMCPTools = async () => {
-    setIsLoading(true);
-    setIsTyping(true);
+  setIsLoading(true);
+  setIsTyping(true);
+  
+  const tests = [
+    { tool: "get_system_info", args: {} },
+    { tool: "list_directory", args: { path: "." } },
+    { tool: "search_outlook_emails", args: { contactName: "test" } },
+    { tool: "search_files_advanced", args: { query: "email", fileTypes: [".eml", ".msg", ".txt"] } }
+  ];
+
+  let testResults = "**🧪 Enhanced MCP Tools Test Results:**\n\n";
+
+  for (const test of tests) {
+    const result = await callMCPTool(test.tool, test.args);
+    testResults += `**${test.tool}:** ${result.success ? "✅ Success" : "❌ Failed"}\n`;
     
-    const tests = [
-        { tool: "get_system_info", args: {} },
-        { tool: "list_directory", args: { path: "." } },
-        { tool: "search_files", args: { query: "email", directory: ".", fileTypes: [".txt", ".md", ".js"] } }
-    ];
-
-    let testResults = "**MCP Tools Test Results:**\n\n";
-
-    for (const test of tests) {
-        const result = await callMCPTool(test.tool, test.args);
-        testResults += `**${test.tool}:** ${result.success ? "✅ Success" : "❌ Failed"}\n`;
-        if (result.success) {
-            if (test.tool === "get_system_info") {
-                testResults += `  • Platform: ${result.systemInfo.platform}\n`;
-                testResults += `  • Current Directory: ${result.systemInfo.currentWorkingDirectory}\n`;
-            } else if (test.tool === "list_directory") {
-                testResults += `  • Found ${result.contents.length} items\n`;
-            } else if (test.tool === "search_files") {
-                testResults += `  • Found ${result.results.length} matching files\n`;
-            }
+    if (result.success) {
+      if (test.tool === "get_system_info") {
+        testResults += `  • Platform: ${result.systemInfo.platform}\n`;
+        testResults += `  • Home Directory: ${result.systemInfo.homeDirectory}\n`;
+        testResults += `  • Search Locations: ${result.systemInfo.searchLocations?.length || 0}\n`;
+      } else if (test.tool === "list_directory") {
+        testResults += `  • Found ${result.contents?.length || 0} items\n`;
+      } else if (test.tool === "search_outlook_emails") {
+        if (result.emails && result.emails.length > 0) {
+          testResults += `  • Found ${result.emails.length} emails\n`;
+          testResults += `  • Source: ${result.source}\n`;
         } else {
-                testResults += `  • Error: ${result.error}\n`;
+          testResults += `  • No emails found (this is normal for test contact)\n`;
+          testResults += `  • Outlook integration: ${result.source ? 'Available' : 'Not available'}\n`;
         }
-        testResults += "\n";
+      } else if (test.tool === "search_files_advanced") {
+        testResults += `  • Found ${result.totalResults || 0} matching files\n`;
+        testResults += `  • Searched ${result.searchLocations?.length || 0} locations\n`;
+      }
+    } else {
+      testResults += `  • Error: ${result.error}\n`;
     }
+    testResults += "\n";
+  }
 
-    setIsTyping(false);
+  // Test actual email generation
+  testResults += "**📧 Testing Email Generation:**\n";
+  const emailTest = await generateEmailWithEnhancedMCP("sarah", "test email generation");
+  
+  if (emailTest.error) {
+    testResults += `❌ Email generation failed: ${emailTest.error}\n`;
+  } else {
+    testResults += `✅ Email generation successful\n`;
+    testResults += `  • Context analysis: ${emailTest.context ? 'Complete' : 'Failed'}\n`;
+    testResults += `  • AI enhanced: ${emailTest.context?.aiEnhanced ? 'Yes' : 'No'}\n`;
+    testResults += `  • Data source: ${emailTest.context?.dataSource || 'Unknown'}\n`;
+  }
 
-    setMessages(prev => [...prev, {
-        type: "ai",
-        content: testResults,
-        mcpMode: true
-    }]);
-    
-    setIsLoading(false);
-  };
+  setIsTyping(false);
+
+  setMessages(prev => [...prev, {
+    type: "ai",
+    content: testResults,
+    mcpMode: true
+  }]);
+  
+  setIsLoading(false);
+};
+
+const parseEmailRequest = (message) => {
+  const emailPatterns = [
+    /draft.*email.*for\s+(\w+)/i,
+    /write.*email.*to\s+(\w+)/i,
+    /email.*(\w+).*about/i,
+    /respond.*to\s+(\w+)/i,
+    /send.*email.*to\s+(\w+)/i,
+    /compose.*email.*for\s+(\w+)/i,
+    /create.*email.*to\s+(\w+)/i,
+    /help.*me.*email\s+(\w+)/i
+  ];
+
+  for (const pattern of emailPatterns) {
+    const match = message.match(pattern);
+    if (match) {
+      return {
+        recipient: match[1].toLowerCase(),
+        originalMessage: message
+      };
+    }
+  }
+  return null;
+};
 
     return (
         <>
